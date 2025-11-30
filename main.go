@@ -13,7 +13,7 @@ import (
 	"github.com/jmoiron/jsonq"
 )
 
-const version = "0.0.1"
+const version = "1.1.0"
 
 var (
 	target      = flag.String("target", "", "target domain to monitor")
