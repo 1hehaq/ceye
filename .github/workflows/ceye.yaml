@@ -1,0 +1,50 @@
+name: monitor 24/7
+
+on:
+  schedule:
+    - cron: '0 */6 * * *'
+  workflow_dispatch:
+    inputs:
+      targets:
+        description: 'Target Domains (use comma for multiple)'
+        required: true
+        type: string
+
+jobs:
+  monitor:
+    runs-on: ubuntu-latest
+    steps:
+      - name: checkout repository
+        uses: actions/checkout@v4
+
+      - name: setup Go
+        uses: actions/setup-go@v4
+        with:
+          go-version: '1.21'
+
+      - name: build
+        run: go build -o ceye .
+
+      - name: create config
+        run: |
+          mkdir -p ~/.config/ceye
+          cat > ~/.config/ceye/provider.yaml << EOF
+          targets:
+          EOF
+          
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            IFS=',' read -ra TARGET_ARRAY <<< "${{ github.event.inputs.targets }}"
+          else
+            TARGET_ARRAY=("github.com" "github.com")
+          fi
+          
+          for target in "${TARGET_ARRAY[@]}"; do
+            trimmed=$(echo "$target" | xargs)
+            if [ -n "$trimmed" ]; then
+              echo "  - $trimmed" >> ~/.config/ceye/provider.yaml
+            fi
+          done
+
+      - name: run ceye
+        run: |
+          timeout 6h ./ceye -webhook ${{ secrets.WEBHOOK }} || true
