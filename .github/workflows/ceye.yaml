@@ -3,12 +3,7 @@ name: monitor 24/7
 on:
   schedule:
     - cron: '0 */6 * * *'
-  workflow_dispatch:
-    inputs:
-      targets:
-        description: 'Target Domains (use comma for multiple)'
-        required: true
-        type: string
+  workflow_dispatch: {}
 
 jobs:
   monitor:
@@ -32,12 +27,7 @@ jobs:
           targets:
           EOF
           
-          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
-            IFS=',' read -ra TARGET_ARRAY <<< "${{ github.event.inputs.targets }}"
-          else
-            TARGET_ARRAY=("github.com" "github.com")
-          fi
-          
+          IFS=',' read -ra TARGET_ARRAY <<< "${{ secrets.TARGET }}"
           for target in "${TARGET_ARRAY[@]}"; do
             trimmed=$(echo "$target" | xargs)
             if [ -n "$trimmed" ]; then
