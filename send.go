@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
-	"strings"
 	"sync"
 	"time"
 )
@@ -71,56 +70,90 @@ func (n *notificationBuffer) flush(target string) {
 }
 
 func (n *notificationBuffer) send(target string, domains []string) {
-	if webhookURL == "" {
+	if notifyDiscord && webhookURL != "" {
+		payload := buildDiscordPayload(target, domains)
+
+		jsonData, err := json.Marshal(payload)
+		if err != nil {
+			logger.Error("failed to marshal payload", "error", err)
+		} else {
+			for attempt := 0; attempt < maxRetries; attempt++ {
+				resp, err := http.Post(webhookURL, "application/json", bytes.NewBuffer(jsonData))
+				if err != nil {
+					logger.Error("failed to send notification", "error", err)
+					return
+				}
+
+				switch resp.StatusCode {
+				case http.StatusOK, http.StatusNoContent:
+					resp.Body.Close()
+					return
+				case http.StatusTooManyRequests:
+					resp.Body.Close()
+					logger.Warn("rate limited, waiting", "attempt", attempt+1)
+					time.Sleep(rateLimitWait * time.Duration(attempt+1))
+					continue
+				default:
+					resp.Body.Close()
+					logger.Warn("webhook error", "status", resp.StatusCode)
+					return
+				}
+			}
+
+			logger.Error("failed to send after retries", "target", target)
+		}
+	}
+
+	if notifyTelegram {
+		sendToTelegram(target, domains)
+	}
+}
+
+func sendToTelegram(target string, domains []string) {
+	if telegramToken == "" || telegramChatID == "" {
 		return
 	}
 
-	domainList := strings.Join(domains, "\n")
+	text := buildTelegramMessage(target, domains)
 
 	payload := map[string]interface{}{
-		"tts": false,
-		"embeds": []map[string]interface{}{
-			{
-				"title":       fmt.Sprintf("%s  [%d]", target, len(domains)),
-				"description": fmt.Sprintf("```\n%s\n```", domainList),
-				"color":       2829617,
-				"author": map[string]string{
-					"name": "1hehaq/ceye",
-					"url":  "https://github.com/1hehaq/ceye",
-				},
-				"timestamp": time.Now().Format(time.RFC3339),
-			},
-		},
+		"chat_id":                  telegramChatID,
+		"text":                     text,
+		"parse_mode":               "Markdown",
+		"disable_web_page_preview": true,
 	}
 
 	jsonData, err := json.Marshal(payload)
 	if err != nil {
-		logger.Error("failed to marshal payload", "error", err)
+		logger.Error("failed to marshal telegram payload", "error", err)
 		return
 	}
 
+	url := fmt.Sprintf("https://api.telegram.org/bot%s/sendMessage", telegramToken)
+
 	for attempt := 0; attempt < maxRetries; attempt++ {
-		resp, err := http.Post(webhookURL, "application/json", bytes.NewBuffer(jsonData))
+		resp, err := http.Post(url, "application/json", bytes.NewBuffer(jsonData))
 		if err != nil {
-			logger.Error("failed to send notification", "error", err)
+			logger.Error("failed to send telegram notification", "error", err)
 			return
 		}
 
-		switch resp.StatusCode {
-		case http.StatusOK, http.StatusNoContent:
+		if resp.StatusCode == http.StatusOK {
 			resp.Body.Close()
 			return
-		case http.StatusTooManyRequests:
+		}
+
+		if resp.StatusCode == http.StatusTooManyRequests {
 			resp.Body.Close()
-			logger.Warn("rate limited, waiting", "attempt", attempt+1)
+			logger.Warn("telegram rate limited, waiting", "attempt", attempt+1)
 			time.Sleep(rateLimitWait * time.Duration(attempt+1))
 			continue
-		default:
-			resp.Body.Close()
-			logger.Warn("webhook error", "status", resp.StatusCode)
-			return
 		}
+
+		resp.Body.Close()
+		logger.Warn("telegram send error", "status", resp.StatusCode)
+		return
 	}
 
-	logger.Error("failed to send after retries", "target", target)
+	logger.Error("failed to send telegram after retries", "target", target)
 }
