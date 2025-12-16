@@ -9,8 +9,16 @@ import (
 )
 
 type Config struct {
-	Webhook string   `yaml:"webhook"`
-	Targets []string `yaml:"targets"`
+	Webhook          string   `yaml:"webhook"`
+	TelegramBotToken string   `yaml:"telegram_bot_token"`
+	TelegramChatID   string   `yaml:"telegram_chat_id"`
+	Targets          []string `yaml:"targets"`
+}
+
+var customConfigPath string
+
+func setConfigPath(path string) {
+	customConfigPath = path
 }
 
 func getConfigDir() (string, error) {
@@ -22,6 +30,9 @@ func getConfigDir() (string, error) {
 }
 
 func getConfigPath() (string, error) {
+	if customConfigPath != "" {
+		return customConfigPath, nil
+	}
 	dir, err := getConfigDir()
 	if err != nil {
 		return "", err
@@ -45,6 +56,10 @@ func createConfigTemplate() error {
 
 # discord webhook url for notifications
 webhook: ""
+
+# telegram bot credentials for notifications (optional)
+telegram_bot_token: ""
+telegram_chat_id: ""
 
 # target wildcard to monitor
 targets:
