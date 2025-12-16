@@ -29,7 +29,7 @@ func displayHelp() {
 
 	fmt.Println(successStyle.Render(" configuration:"))
 	fmt.Printf("    %s config file location: ~/.config/ceye/provider.yaml\n", argStyle.Render("•"))
-	fmt.Printf("    %s supports multiple targets and notification providers\n", argStyle.Render("•"))
+	fmt.Printf("    %s supports multiple targets and notification providers\n\n", argStyle.Render("•"))
 
 	fmt.Println(successStyle.Render(" requirements:"))
 	fmt.Printf("    %s\n\n", argStyle.Render("docker must be installed and running"))
