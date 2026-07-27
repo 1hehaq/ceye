@@ -285,8 +285,12 @@ func processMessage(jq jsonq.JsonQuery) {
 	}
 
 	for _, domain := range domains {
+		domainLower := strings.ToLower(domain)
 		for _, target := range targets {
-			if strings.Contains(strings.ToLower(domain), strings.ToLower(target)) {
+			targetLower := strings.ToLower(target)
+			if strings.Contains(domainLower, targetLower) &&
+				!strings.Contains(domainLower, "google.com.cn") &&
+				!strings.Contains(domainLower, "yyyoutube") {
 				logger.Info("new subdomain", "domain", domain, "target", target)
 				if notifyDiscord || notifyTelegram {
 					go sendToDiscord(domain, target)
